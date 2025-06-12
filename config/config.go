@@ -8,8 +8,9 @@ type Config struct {
 
 // State defines a command to be run as a managed process.
 type State struct {
-	Name string `mapstructure:"name"`
-	Cmd  string `mapstructure:"cmd"`
+	Name   string                 `mapstructure:"name"`
+	Type   string                 `mapstructure:"type"`
+	Params map[string]interface{} `mapstructure:"params"`
 }
 
 // Task defines a periodic or one-shot action to be performed.
