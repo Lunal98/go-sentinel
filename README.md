@@ -7,7 +7,7 @@ go-sentinel is a lightweight, Go-based daemon designed to manage long-running pr
 
 ## ✨ Features
 
-* **State Management:** Define and transition between different operational states, each launching a specified long-running process.
+* **State Management:** Define and transition between different operational states, each launching a specified long-running process with customizable handlers.
 * **Graceful Process Control:** Ensures processes are started and stopped cleanly, with support for `SIGTERM` and `SIGKILL` fallbacks.
 * **Dynamic Configuration Reloading:** Update `go-sentinel`'s behavior on the fly by modifying its YAML configuration file (supports `SIGHUP` for state transitions).
 * **Task Scheduling:** Execute one-shot or periodic tasks.
@@ -41,8 +41,8 @@ go-sentinel is a lightweight, Go-based daemon designed to manage long-running pr
 2. `$HOME/.go-sentinel/`
 3. The current working directory
 
-You specify the path of the config path using the `go-sentinel_CONFIG` environment variable.
-Environment variables prefixed with `go-sentinel_` (e.g., `go-sentinel_STATES_0_NAME`) can override configuration values.
+You specify the path of the config path using the `GO_SENTINEL_CONFIG` environment variable.
+Environment variables prefixed with `GO_SENTINEL_` (e.g., `GO_SENTINEL_STATES_0_NAME`) can override configuration values.
 
 ### Running go-sentinel
 
@@ -57,13 +57,13 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/go-go-sentinel
+ExecStart=/usr/local/bin/go-sentinel
 Restart=on-failure
 RestartSec=5
 ExecReload=/bin/kill -HUP $MAINPID
 
 # Set the path to the configuration file here.
-Environment="go-sentinel_CONFIG=/etc/go-sentinel/config.yml"
+Environment="GO_SENTINEL_CONFIG=/etc/go-sentinel/config.yml"
 
 [Install]
 WantedBy=multi-user.target
@@ -72,12 +72,21 @@ WantedBy=multi-user.target
 #### Example `config.yaml`
 
 ```yaml
+
 # States define long-running processes that go-sentinel manages.
 states:
   - name:
-    cmd: '/usr/bin/cvlc --loop /mnt/fileserver/asdasd'
+    type: cmd
+    params:
+      cmd: '/usr/bin/cvlc --loop /mnt/fileserver/asdasd'
   - name2:
-    cmd: '/usr/bin/fbi /mnt/fileserver/wp/*.jpg'
+    type: mycustomhandler
+    params:
+      cmd: '/usr/bin/fbi {{path}}'
+      refreshinterval: 5s
+      extensionfilter:
+        - jpg
+        - png
 # Tasks define checks that make sure the dependcies of the States are in a healthy condition
 tasks:
   - name: mount
@@ -99,7 +108,9 @@ tasks:
     action:
       type: process
       params:
-        procname: '/usr/bin/clvc'````
+        procname: '/usr/bin/clvc'
+
+  ```
 
 
 ### Signals
@@ -116,9 +127,29 @@ tasks:
   * `main.go`: Entry point, handles configuration loading, signal handling, and orchestrates the state and task managers.
   * `config/`: Defines the structure for `go-sentinel`'s YAML configuration.
   * `state/`: Manages the lifecycle of long-running processes ("states"), including starting, stopping, and transitioning between them.
+  * `state/handlers`: Implements the task handlers.
   * `task/`: Implements the task scheduling logic and defines interfaces for custom task handlers.
+  * `task/handlers`: Implements the task handlers.
   * `utils/`: Contains utility functions (e.g., for checking mount status).
 
+### Adding New State Handlers
+
+To extend go-sentinel with new state types, implement the StateHandler interface defined in state/handlers/handlers.go:
+
+```go
+// state/handlers/handlers.go
+type StateHandler interface {
+    Start(ctx context.Context, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
+    Stop(cmd *exec.Cmd, log *zerolog.Logger) error
+    Restart(ctx context.Context, oldCmd *exec.Cmd, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
+}
+```
+
+
+Then, register your new handler in an init() function within your handler package, or explicitly in main.go:
+```go
+statehandlers.Register("mycustomhandler", &MyCustomStateHandler{})
+```
 ### Adding New Task Handlers
 
 To extend `go-sentinel` with new functionality, implement the `TaskHandler` interface:
@@ -137,4 +168,6 @@ Then, register your new handler in `main.go`:
 
 // ... in main()
 taskHandlers.Register("your_new_action_type", &task.YourNewTaskHandler{})
+
+
 ```

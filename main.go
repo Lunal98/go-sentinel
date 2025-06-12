@@ -48,13 +48,13 @@ func main() {
 	v.AddConfigPath("/etc/go-sentinel/")
 	v.AddConfigPath("$HOME/.go-sentinel/")
 	v.AddConfigPath(".")
-	v.SetEnvPrefix("go-sentinel")
+	v.SetEnvPrefix("go_sentinel")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	if configPath := os.Getenv("go-sentinel_CONFIG"); configPath != "" {
+	if configPath := os.Getenv("GO_SENTINEL_CONFIG"); configPath != "" {
 		v.SetConfigFile(configPath)
-		log.Info().Str("path", configPath).Msg("Using config file from go-sentinel_CONFIG environment variable")
+		log.Info().Str("path", configPath).Msg("Using config file from GO_SENTINEL_CONFIG environment variable")
 	}
 
 	if err := v.ReadInConfig(); err != nil {
