@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -58,4 +59,39 @@ func IsMounted(device, dir string) (bool, error) {
 
 	// No matching mount entry was found.
 	return false, nil
+}
+
+// isProcessRunning iterates through the /proc filesystem to find a running process.
+// It checks if the command line in /proc/[pid]/cmdline contains the target name.
+func IsProcessRunning(name string) (bool, error) {
+	// Read all entries in the /proc directory.
+	dirs, err := os.ReadDir("/proc")
+	if err != nil {
+		return false, fmt.Errorf("failed to read /proc: %w", err)
+	}
+
+	for _, dir := range dirs {
+		// We only care about directories that are PIDs (i.e., numbers).
+		if !dir.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join("/proc", dir.Name(), "cmdline")); err != nil {
+			continue // Not a process directory or we can't access it.
+		}
+
+		// Read the command line for the process.
+		cmdlinePath := filepath.Join("/proc", dir.Name(), "cmdline")
+		cmdlineBytes, err := os.ReadFile(cmdlinePath)
+		if err != nil {
+			continue // Process might have terminated, or permissions issue.
+		}
+
+		// The cmdline file uses null bytes to separate arguments.
+		cmdline := string(cmdlineBytes)
+		if strings.Contains(cmdline, name) {
+			return true, nil // Found the process.
+		}
+	}
+
+	return false, nil // Did not find the process.
 }

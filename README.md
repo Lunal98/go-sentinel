@@ -161,12 +161,10 @@ type TaskHandler interface {
 }
 ```
 
-Then, register your new handler in `main.go`:
+Then, register your new handler:
 
 ```go
-// main.go
 
-// ... in main()
 taskHandlers.Register("your_new_action_type", &task.YourNewTaskHandler{})
 
 
