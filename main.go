@@ -26,6 +26,7 @@ import (
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
 	"github.com/Lunal98/go-sentinel/task"
+	taskhandlers "github.com/Lunal98/go-sentinel/task/handlers"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
@@ -84,9 +85,9 @@ func main() {
 	stateManager := state.NewManager(currentConfig.States, &log.Logger)
 	configMutex.RUnlock()
 
-	taskHandlers := make(task.HandlerRegistry)
-	taskHandlers.Register("mount", &task.MountTaskHandler{})
-	taskHandlers.Register("process", &task.ProcessTaskHandler{})
+	taskHandlers := make(taskhandlers.Registry)
+	taskHandlers.Register("mount", &taskhandlers.MountTaskHandler{})
+	taskHandlers.Register("process", &taskhandlers.ProcessTaskHandler{})
 
 	configMutex.RLock()
 	taskScheduler := task.NewScheduler(currentConfig.Tasks, taskHandlers, &log.Logger)

@@ -22,6 +22,7 @@ import (
 
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
+	"github.com/Lunal98/go-sentinel/task/handlers"
 
 	"github.com/rs/zerolog"
 )
@@ -29,14 +30,14 @@ import (
 // Scheduler manages the execution of one-shot and periodic tasks.
 type Scheduler struct {
 	tasks       []config.Task
-	handlers    HandlerRegistry
+	handlers    handlers.Registry
 	log         *zerolog.Logger
 	mu          sync.Mutex
 	cancelFuncs map[string]context.CancelFunc
 }
 
 // NewScheduler creates a new task scheduler.
-func NewScheduler(tasks []config.Task, handlers HandlerRegistry, logger *zerolog.Logger) *Scheduler {
+func NewScheduler(tasks []config.Task, handlers handlers.Registry, logger *zerolog.Logger) *Scheduler {
 	return &Scheduler{
 		tasks:       tasks,
 		handlers:    handlers,
@@ -144,7 +145,7 @@ func (s *Scheduler) executeTask(ctx context.Context, task config.Task, sm *state
 	err := handler.Execute(ctx, s.log, task.Action.Params)
 	if err == nil {
 		s.log.Debug().Str("task", task.Name).Msg("Task executed successfully")
-	} else if err == ErrProcessNotRunning {
+	} else if err == handlers.ErrProcessNotRunning {
 		sm.Saferestart()
 	} else {
 		s.log.Error().Err(err).Str("task", task.Name).Msg("Task execution failed")

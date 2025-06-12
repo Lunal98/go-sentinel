@@ -120,7 +120,7 @@ func (m *Manager) startCurrentUnsafe() {
 	state := m.states[m.currentIndex]
 	m.log.Info().Str("name", state.Name).Str("type", state.Type).Msg("Attempting to start state with handler")
 
-	handler, ok := handlers.HandlerRegistry[state.Type]
+	handler, ok := handlers.Registry[state.Type]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type")
 		return
@@ -163,7 +163,7 @@ func (m *Manager) stopCurrentUnsafe() {
 	}
 
 	state := m.states[m.currentIndex]
-	handler, ok := handlers.HandlerRegistry[state.Type]
+	handler, ok := handlers.Registry[state.Type]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type, attempting default stop")
 		if m.currentCmd != nil && m.currentCmd.Process != nil {
@@ -252,7 +252,7 @@ func (m *Manager) Saferestart() {
 	}
 
 	state := m.states[m.currentIndex]
-	handler, ok := handlers.HandlerRegistry[state.Type]
+	handler, ok := handlers.Registry[state.Type]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type, cannot safely restart.")
 		m.log.Info().Msg("Performing a default restart of the current state.")

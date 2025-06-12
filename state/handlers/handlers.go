@@ -40,12 +40,12 @@ type StateHandler interface {
 	Restart(ctx context.Context, oldCmd *exec.Cmd, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
 }
 
-// HandlerRegistry stores registered StateHandlers.
-var HandlerRegistry = make(map[string]StateHandler)
+// Registry stores registered StateHandlers.
+var Registry = make(map[string]StateHandler)
 
-// RegisterHandler registers a StateHandler for a given type string.
-func RegisterHandler(handlerType string, handler StateHandler) {
-	HandlerRegistry[handlerType] = handler
+// Register registers a StateHandler for a given type string.
+func Register(handlerType string, handler StateHandler) {
+	Registry[handlerType] = handler
 }
 
 // DefaultCmdStateHandler implements StateHandler for "cmd" type states.
@@ -110,5 +110,5 @@ func (h *DefaultCmdStateHandler) Restart(ctx context.Context, oldCmd *exec.Cmd, 
 }
 
 func init() {
-	RegisterHandler("cmd", &DefaultCmdStateHandler{})
+	Register("cmd", &DefaultCmdStateHandler{})
 }

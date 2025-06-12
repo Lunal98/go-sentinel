@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package task
+package handlers
 
 import (
 	"context"
@@ -26,10 +26,10 @@ type Handler interface {
 	Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error
 }
 
-// HandlerRegistry is a map to store and retrieve task handlers by their type name.
-type HandlerRegistry map[string]Handler
+// Registry is a map to store and retrieve task handlers by their type name.
+type Registry map[string]Handler
 
 // Register adds a new handler to the registry.
-func (r HandlerRegistry) Register(actionType string, handler Handler) {
+func (r Registry) Register(actionType string, handler Handler) {
 	r[actionType] = handler
 }
