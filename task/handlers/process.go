@@ -27,7 +27,7 @@ import (
 // ProcessTaskHandler handles tasks that check for a running process.
 type ProcessTaskHandler struct{}
 
-var ErrProcessNotRunning = errors.New("checked for process, but it was not found")
+var ErrProcessNotRunning = errors.New("process not running")
 
 // Execute checks if a process with a given name is running.
 func (h *ProcessTaskHandler) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {

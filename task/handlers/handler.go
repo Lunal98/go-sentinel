@@ -26,10 +26,14 @@ type Handler interface {
 	Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error
 }
 
-// Registry is a map to store and retrieve task handlers by their type name.
-type Registry map[string]Handler
+// Registry stores registered TaskHandlers.
+var Registry = make(map[string]Handler)
 
-// Register adds a new handler to the registry.
-func (r Registry) Register(actionType string, handler Handler) {
-	r[actionType] = handler
+// Register adds a new handler to the global registry.
+func Register(actionType string, handler Handler) {
+	Registry[actionType] = handler
+}
+func init() {
+	Register("mount", &MountTaskHandler{})
+	Register("process", &ProcessTaskHandler{})
 }

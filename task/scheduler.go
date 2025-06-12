@@ -30,17 +30,15 @@ import (
 // Scheduler manages the execution of one-shot and periodic tasks.
 type Scheduler struct {
 	tasks       []config.Task
-	handlers    handlers.Registry
 	log         *zerolog.Logger
 	mu          sync.Mutex
 	cancelFuncs map[string]context.CancelFunc
 }
 
 // NewScheduler creates a new task scheduler.
-func NewScheduler(tasks []config.Task, handlers handlers.Registry, logger *zerolog.Logger) *Scheduler {
+func NewScheduler(tasks []config.Task, logger *zerolog.Logger) *Scheduler {
 	return &Scheduler{
 		tasks:       tasks,
-		handlers:    handlers,
 		log:         logger,
 		cancelFuncs: make(map[string]context.CancelFunc),
 	}
@@ -135,7 +133,7 @@ func (s *Scheduler) executeTask(ctx context.Context, task config.Task, sm *state
 		}
 	}
 
-	handler, ok := s.handlers[task.Action.Type]
+	handler, ok := handlers.Registry[task.Action.Type]
 	if !ok {
 		s.log.Error().Str("task", task.Name).Str("type", task.Action.Type).Msg("No handler registered for action type")
 		return
@@ -146,6 +144,7 @@ func (s *Scheduler) executeTask(ctx context.Context, task config.Task, sm *state
 	if err == nil {
 		s.log.Debug().Str("task", task.Name).Msg("Task executed successfully")
 	} else if err == handlers.ErrProcessNotRunning {
+		s.log.Warn().Msg("Task executed successfully, but process is not running, restarting state")
 		sm.Saferestart()
 	} else {
 		s.log.Error().Err(err).Str("task", task.Name).Msg("Task execution failed")
