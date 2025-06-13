@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package main
+package sentinel
 
 import (
 	"context"
@@ -174,6 +174,7 @@ func (e *NoStatesError) Error() string {
 	return "configuration must contain at least one state"
 }
 
+/*
 func main() {
 	if err := Init(); err != nil {
 		if _, ok := err.(*NoStatesError); ok {
@@ -190,3 +191,4 @@ func main() {
 
 	log.Info().Msg("Service daemon stopped gracefully")
 }
+*/
