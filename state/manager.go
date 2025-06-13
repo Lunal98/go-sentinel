@@ -39,6 +39,12 @@ type Manager struct {
 	managerCancel context.CancelFunc
 }
 
+type StateHandler = handlers.StateHandler
+
+func (s *Manager) RegisterHandler(name string, handl handlers.StateHandler) {
+	handlers.Register(name, handl)
+}
+
 // NewManager creates a new state manager.
 func NewManager(states []config.State, logger *zerolog.Logger) *Manager {
 	return &Manager{

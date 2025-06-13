@@ -21,16 +21,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Handler defines the interface for a task that can be executed.
-type Handler interface {
+// TaskHandler defines the interface for a task that can be executed.
+type TaskHandler interface {
 	Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error
 }
 
 // Registry stores registered TaskHandlers.
-var Registry = make(map[string]Handler)
+var Registry = make(map[string]TaskHandler)
 
 // Register adds a new handler to the global registry.
-func Register(actionType string, handler Handler) {
+func Register(actionType string, handler TaskHandler) {
 	Registry[actionType] = handler
 }
 func init() {

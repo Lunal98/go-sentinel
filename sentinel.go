@@ -18,10 +18,8 @@ package sentinel
 import (
 	"context"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
@@ -35,16 +33,16 @@ import (
 )
 
 var (
-	configMutex   sync.RWMutex
-	currentConfig config.Config
-	v             *viper.Viper
-	stateManager  *state.Manager
-	taskScheduler *task.Scheduler
-	log           *zerolog.Logger
+	configMutex       sync.RWMutex
+	currentConfig     config.Config
+	v                 *viper.Viper
+	stateManager      *state.Manager
+	taskScheduler     *task.Scheduler
+	log               *zerolog.Logger
+	userTaskHandlers  map[string]TaskHandler
+	userStateHandlers map[string]StateHandler
 )
 
-// Init initializes the configuration and sets up logging.
-// It returns an error if initialization fails.
 func init() {
 	templog := globalLogger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log = &templog
@@ -64,6 +62,23 @@ func init() {
 	}
 }
 
+type TaskHandler = task.TaskHandler
+type StateHandler = state.StateHandler
+
+func RegisterTaskHandler(name string, handl TaskHandler) {
+	userTaskHandlers[name] = handl
+	if taskScheduler != nil {
+		taskScheduler.RegisterHandler(name, handl)
+	}
+}
+func RegisterStateHandler(name string, handl StateHandler) {
+	userStateHandlers[name] = handl
+	if stateManager != nil {
+		stateManager.RegisterHandler(name, handl)
+
+	}
+}
+
 // SetConfigFile explicitly defines the path, name and extension of the config file.
 func SetConfigFile(conf string) {
 	v.SetConfigFile(conf)
@@ -72,14 +87,15 @@ func SetLogLevel(lvl zerolog.Level) {
 	log.Level(lvl)
 }
 
-// Initialize configuration
+// Init initializes the configuration and sets up logging.
+// It returns an error if initialization fails.
 func Init() error {
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Warn().Str("path", v.ConfigFileUsed()).Msg("No config file found. Looking for configuration via environment variables.")
 		} else {
-			return err // Return error for unhandled cases
+			return err
 		}
 	} else {
 		log.Info().Str("path", v.ConfigFileUsed()).Msg("Configuration loaded successfully from file")
@@ -92,18 +108,28 @@ func Init() error {
 	}
 
 	if len(currentConfig.States) == 0 {
-		return &NoStatesError{} // Custom error for clarity
+		return &NoStatesError{}
+	}
+	stateManager = state.NewManager(currentConfig.States, log)
+	for i, n := range userStateHandlers {
+		stateManager.RegisterHandler(i, n)
+	}
+	taskScheduler = task.NewScheduler(currentConfig.Tasks, log)
+	for i, n := range userTaskHandlers {
+		taskScheduler.RegisterHandler(i, n)
 	}
 
 	return nil
+}
+func Next() {
+	if stateManager != nil {
+		stateManager.Next()
+	}
 }
 
 // Start runs the main logic of the service, including state management and task scheduling.
 // It blocks until a termination signal is received or the context is cancelled.
 func Start(ctx context.Context) {
-
-	stateManager = state.NewManager(currentConfig.States, log)
-	taskScheduler = task.NewScheduler(currentConfig.Tasks, log)
 
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("event", e.String()).Msg("Config file changed, attempting to reload...")
@@ -144,27 +170,14 @@ func Start(ctx context.Context) {
 		taskScheduler.Run(ctx, stateManager)
 	}()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	//sigChan := make(chan os.Signal, 1)
+	//signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	log.Info().Int("pid", os.Getpid()).Msg("Service daemon started. Waiting for signals.")
 
-	for {
-		select {
-		case s := <-sigChan:
-			switch s {
-			case syscall.SIGHUP:
-				log.Info().Msg("SIGHUP received, rotating to the next state")
-				stateManager.Next()
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Info().Msg("Termination signal received, shutting down")
-				return // Exit the loop and proceed to cleanup
-			}
-		case <-ctx.Done():
-			log.Info().Msg("Context cancelled, shutting down")
-			return // Exit the loop and proceed to cleanup
-		}
-	}
+	<-ctx.Done()
+	log.Info().Msg("Context cancelled, shutting down")
+
 }
 
 // NoStatesError is a custom error type for when no states are configured.
@@ -173,22 +186,3 @@ type NoStatesError struct{}
 func (e *NoStatesError) Error() string {
 	return "configuration must contain at least one state"
 }
-
-/*
-func main() {
-	if err := Init(); err != nil {
-		if _, ok := err.(*NoStatesError); ok {
-			log.Fatal().Err(err).Msg("Initialization failed")
-		} else {
-			log.Fatal().Err(err).Msg("Failed to initialize service")
-		}
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // Ensure cancel is called to clean up resources
-
-	Start(ctx)
-
-	log.Info().Msg("Service daemon stopped gracefully")
-}
-*/

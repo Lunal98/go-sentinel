@@ -8,11 +8,9 @@ go-sentinel is a lightweight, Go-based daemon designed to manage long-running pr
 ## ✨ Features
 
 * **State Management:** Define and transition between different operational states, each launching a specified long-running process with customizable handlers.
-* **Graceful Process Control:** Ensures processes are started and stopped cleanly, with support for `SIGTERM` and `SIGKILL` fallbacks.
-* **Dynamic Configuration Reloading:** Update `go-sentinel`'s behavior on the fly by modifying its YAML configuration file (supports `SIGHUP` for state transitions).
 * **Task Scheduling:** Execute one-shot or periodic tasks.
 * **Conditional Task Execution:** Run tasks only when the system is in a specific defined state.
-* **Extensible Task Handlers:** Easily integrate new types of tasks (e.g., mount checks, process restarts).
+* **Extensible Handlers:** Easily integrate new types of tasks or states (e.g., mount checks, process restarts, custom cmd wrappers).
 * **Robust Logging:** Provides detailed logging using `zerolog` for easy debugging and monitoring.
 
 ## 🚀 Getting Started
@@ -23,16 +21,73 @@ go-sentinel is a lightweight, Go-based daemon designed to manage long-running pr
 
 ### Installation
 
-1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/Lunal98/go-sentinel.git](https://github.com/Lunal98/go-sentinel.git)
-    cd go-sentinel
+    go get github.com/Lunal98/go-sentinel
     ```
-2.  **Build the executable:**
-    ```bash
-    go build -o go-sentinel .
-    ```
-    This will create a `go-sentinel` executable in your current directory.
+### Basic Usage
+
+go-sentinel is designed to be integrated directly into your Go applications. Here's a basic example:
+
+```go
+package main
+
+import (
+	"context"
+
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/Lunal98/go-sentinel"
+	"github.com/rs/zerolog"                     // For log level configuration
+)
+
+func main() {
+
+	// Optional: Set a specific configuration file path
+	// sentinel.SetConfigFile("/etc/my-app/go-sentinel.yaml")
+
+	
+	sentinel.SetLogLevel(zerolog.ErrorLevel)
+
+	// Initialize go-sentinel. This loads the configuration and sets up the logger.
+	if err := sentinel.Init(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize sentinel config")
+	}
+
+	// Register custom state and task handlers *before* starting sentinel.
+	// Replace 'myCustomTaskHandler' and 'myCustomStateHandler' with your actual implementations.
+	// You would typically define these structs and their methods elsewhere in your application.
+	sentinel.RegisterTaskHandler("mycustomtaskhandler", &myCustomTaskHandler{})
+	sentinel.RegisterStateHandler("mycustomstatehandler", &myCustomStateHandler{})
+
+  sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	
+	go sentinel.Start(ctx)
+		for {
+		select {
+		case s := <-sigChan:
+			switch s {
+			case syscall.SIGHUP:
+				log.Info().Msg("SIGHUP received, rotating to the next state")
+				sentinel.Next()
+			case syscall.SIGINT, syscall.SIGTERM:
+				log.Info().Msg("Termination signal received, shutting down")
+				return
+			}
+		case <-ctx.Done():
+			log.Info().Msg("Context cancelled, shutting down")
+			return
+		}
+	}
+
+}
+```
 
 ### Configuration
 
@@ -44,30 +99,8 @@ go-sentinel is a lightweight, Go-based daemon designed to manage long-running pr
 You specify the path of the config path using the `GO_SENTINEL_CONFIG` environment variable.
 Environment variables prefixed with `GO_SENTINEL_` (e.g., `GO_SENTINEL_STATES_0_NAME`) can override configuration values.
 
-### Running go-sentinel
+You can explicitly set the configuration file path using `sentinel.SetConfigFile("your/path/to/config.yaml")` before calling `sentinel.Init()`.
 
-`go-sentinel` is designed to be used as a systemctl service
-
-#### Example systemd file
-
-```
-[Unit]
-Description=go-sentinel Daemon
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/go-sentinel
-Restart=on-failure
-RestartSec=5
-ExecReload=/bin/kill -HUP $MAINPID
-
-# Set the path to the configuration file here.
-Environment="GO_SENTINEL_CONFIG=/etc/go-sentinel/config.yml"
-
-[Install]
-WantedBy=multi-user.target
-```
 
 #### Example `config.yaml`
 
@@ -113,24 +146,19 @@ tasks:
   ```
 
 
-### Signals
-
-`go-sentinel` responds to the following OS signals:
-
-  * `SIGINT` (Ctrl+C) / `SIGTERM`: Gracefully shuts down `go-sentinel` and any running processes.
-  * `SIGHUP`: Triggers `go-sentinel` to rotate to the next defined state in its configuration. Also triggers a configuration file reload if changes are detected.
 
 ## 🛠️ Development
 
 ### Project Structure
 
-  * `main.go`: Entry point, handles configuration loading, signal handling, and orchestrates the state and task managers.
+  * `/`: Entry point, handles configuration loading, signal handling, and orchestrates the state and task managers.
   * `config/`: Defines the structure for `go-sentinel`'s YAML configuration.
   * `state/`: Manages the lifecycle of long-running processes ("states"), including starting, stopping, and transitioning between them.
   * `state/handlers`: Implements the task handlers.
   * `task/`: Implements the task scheduling logic and defines interfaces for custom task handlers.
   * `task/handlers`: Implements the task handlers.
   * `utils/`: Contains utility functions (e.g., for checking mount status).
+  
 
 ### Adding New State Handlers
 
@@ -146,9 +174,9 @@ type StateHandler interface {
 ```
 
 
-Then, register your new handler in an init() function within your handler package, or explicitly in main.go:
+Then, register your new handler using sentinel.RegisterStateHandler in your main function
 ```go
-statehandlers.Register("mycustomhandler", &MyCustomStateHandler{})
+sentinel.RegisterStateHandler("mycustomhandler", &MyCustomStateHandler{})
 ```
 ### Adding New Task Handlers
 
@@ -161,11 +189,11 @@ type TaskHandler interface {
 }
 ```
 
-Then, register your new handler:
+Then, register your new handler using sentinel.RegisterTaskHandler in your main function 
 
 ```go
 
-taskHandlers.Register("your_new_action_type", &task.YourNewTaskHandler{})
+ sentinel.RegisterTaskHandler("your_new_action_type", &MyCustomTaskHandler{})
 
 
 ```

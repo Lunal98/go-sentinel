@@ -35,6 +35,8 @@ type Scheduler struct {
 	cancelFuncs map[string]context.CancelFunc
 }
 
+type TaskHandler = handlers.TaskHandler
+
 // NewScheduler creates a new task scheduler.
 func NewScheduler(tasks []config.Task, logger *zerolog.Logger) *Scheduler {
 	return &Scheduler{
@@ -42,6 +44,10 @@ func NewScheduler(tasks []config.Task, logger *zerolog.Logger) *Scheduler {
 		log:         logger,
 		cancelFuncs: make(map[string]context.CancelFunc),
 	}
+}
+
+func (s *Scheduler) RegisterHandler(name string, handl handlers.TaskHandler) {
+	handlers.Register(name, handl)
 }
 
 // Run starts the scheduler, which executes tasks based on their frequency.
