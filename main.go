@@ -29,7 +29,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+
 	"github.com/spf13/viper"
 )
 
@@ -39,14 +39,14 @@ var (
 	v             *viper.Viper
 	stateManager  *state.Manager
 	taskScheduler *task.Scheduler
+	log           *zerolog.Logger
 )
 
 // Init initializes the configuration and sets up logging.
 // It returns an error if initialization fails.
-func Init() error {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-
+func init() {
+	*log = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Level(zerolog.InfoLevel)
 	v = viper.New()
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
@@ -56,15 +56,26 @@ func Init() error {
 	v.SetEnvPrefix("go_sentinel")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if configPath := os.Getenv("GO_SENTINEL_CONFIG"); configPath != "" {
 		v.SetConfigFile(configPath)
-		log.Info().Str("path", configPath).Msg("Using config file from GO_SENTINEL_CONFIG environment variable")
 	}
+}
+
+// SetConfigFile explicitly defines the path, name and extension of the config file.
+func SetConfigFile(conf string) {
+	v.SetConfigFile(conf)
+}
+func SetLogLevel(lvl zerolog.Level) {
+	log.Level(lvl)
+}
+
+// Initialize configuration
+func Init() error {
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Warn().Msg("No config file found. Looking for configuration via environment variables.")
+			log.Warn().Str("path", v.ConfigFileUsed()).Msg("No config file found. Looking for configuration via environment variables.")
 		} else {
 			return err // Return error for unhandled cases
 		}
@@ -82,8 +93,15 @@ func Init() error {
 		return &NoStatesError{} // Custom error for clarity
 	}
 
-	stateManager = state.NewManager(currentConfig.States, &log.Logger)
-	taskScheduler = task.NewScheduler(currentConfig.Tasks, &log.Logger)
+	return nil
+}
+
+// Start runs the main logic of the service, including state management and task scheduling.
+// It blocks until a termination signal is received or the context is cancelled.
+func Start(ctx context.Context) {
+
+	stateManager = state.NewManager(currentConfig.States, log)
+	taskScheduler = task.NewScheduler(currentConfig.Tasks, log)
 
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("event", e.String()).Msg("Config file changed, attempting to reload...")
@@ -110,12 +128,6 @@ func Init() error {
 
 	v.WatchConfig()
 
-	return nil
-}
-
-// Start runs the main logic of the service, including state management and task scheduling.
-// It blocks until a termination signal is received or the context is cancelled.
-func Start(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)

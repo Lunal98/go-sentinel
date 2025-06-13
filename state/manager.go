@@ -26,7 +26,6 @@ import (
 	"github.com/Lunal98/go-sentinel/state/handlers" // New import for handlers package
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // Manager handles the lifecycle of states (long-running processes).
@@ -226,12 +225,10 @@ func statesEqual(s1, s2 []config.State) bool {
 	for i := range s1 {
 		hash1, err := stateToJSON(s1[i])
 		if err != nil {
-			log.Warn().Err(err).Msg("states can not be converted to json for comparison, assuming change")
 			return false
 		}
 		hash2, err := stateToJSON(s2[i])
 		if err != nil {
-			log.Warn().Err(err).Msg("states can not be converted to json for comparison, assuming change")
 			return false
 		}
 		if hash1 != hash2 {
