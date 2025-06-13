@@ -29,6 +29,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
+	globalLogger "github.com/rs/zerolog/log"
 
 	"github.com/spf13/viper"
 )
@@ -45,7 +46,8 @@ var (
 // Init initializes the configuration and sets up logging.
 // It returns an error if initialization fails.
 func init() {
-	*log = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	templog := globalLogger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log = &templog
 	log.Level(zerolog.InfoLevel)
 	v = viper.New()
 	v.SetConfigName("config")
