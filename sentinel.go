@@ -44,6 +44,8 @@ var (
 )
 
 func init() {
+	userStateHandlers = make(map[string]StateHandler)
+	userTaskHandlers = make(map[string]TaskHandler)
 	templog := globalLogger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log = &templog
 	log.Level(zerolog.InfoLevel)
