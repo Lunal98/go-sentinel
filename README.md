@@ -102,6 +102,76 @@ Environment variables prefixed with `GO_SENTINEL_` (e.g., `GO_SENTINEL_STATES_0_
 You can explicitly set the configuration file path using `sentinel.SetConfigFile("your/path/to/config.yaml")` before calling `sentinel.Init()`.
 
 
+#### Usage & API
+The `sentinel` library offers a set of exposed functions for users to seamlessly integrate and control its behavior. Here's a breakdown of the key functions and their uses:
+
+  * **`Init()`**: This function is crucial for initializing the library, reading the configuration, and setting up the internal components. It should be called once at the beginning of your application's lifecycle. For example:
+
+    ```go
+    if err := sentinel.Init(); err != nil {
+        log.Fatalf("Failed to initialize sentinel: %v", err)
+    }
+    ```
+
+  * **`SetConfigFile(path string)`**: Use this to explicitly define the path to your configuration file (e.g., `config.yaml`). If not set, Sentinel will look for `config.yaml` in standard locations.
+
+    ```go
+    sentinel.SetConfigFile("./my_custom_config.yaml")
+    ```
+
+  * **`SetLogLevel(level zerolog.Level)`**: This allows you to control the verbosity of the library's logging output. You can set it to levels like `zerolog.InfoLevel`, `zerolog.DebugLevel`, or `zerolog.ErrorLevel`.
+
+    ```go
+    sentinel.SetLogLevel(zerolog.DebugLevel)
+    ```
+
+  * **`RegisterTaskHandler(name string, handler TaskHandler)`**: This function is used to register custom functions that will be executed as "tasks" within your defined states. The `name` provided here should match the task name specified in your configuration.
+
+    ```go
+    sentinel.RegisterTaskHandler("my_custom_task", myTaskLogic)
+    ```
+
+  * **`RegisterStateHandler(name string, handler StateHandler)`**: Similar to task handlers, this allows you to register custom functions that will be called when the system enters a specific state. The `name` should correspond to a state defined in your configuration.
+    ```go
+    sentinel.RegisterStateHandler("initial_state", myStateEntryLogic)
+    ```
+  * **`Start(ctx context.Context)`**: This is the main entry point to run the Sentinel service. It will block until the provided context is cancelled, orchestrating state transitions and task execution as defined in your configuration.
+
+    ```go
+    ctx, cancel := context.WithCancel(context.Background())
+    // In a real application, you'd typically handle OS signals to cancel the context
+    go func() {
+        // Simulate some condition to stop the service
+        time.Sleep(10 * time.Minute)
+        cancel()
+    }()
+    sentinel.Start(ctx)
+    ```
+
+  * **`Next()`**: Transition to the next state
+
+    ```go
+    for {
+		  select {
+		  case s := <-sigChan:
+			  switch s {
+			  case syscall.SIGUSR1:
+				  log.Info().Msg("SIGUSR1 received, rotating to the next state")
+				  sentinel.Next()
+        //...
+        }
+      }
+    }
+    ```
+
+  * **`GetCurrentState()`**: This function allows you to retrieve the name of the currently active state.
+
+    ```go
+    currentState := sentinel.GetCurrentState()
+    fmt.Printf("Current active state: %s\n", currentState)
+    ```
+
+
 #### Example `config.yaml`
 
 ```yaml
