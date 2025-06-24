@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package handlers
+package builtin
 
 import (
 	"context"
@@ -27,18 +27,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MountTaskHandler handles tasks that ensure a device is mounted.
-type MountTaskHandler struct{}
+// MountChecker handles checks that ensure a device is mounted.
+type MountChecker struct{}
 
 // Execute performs the mount check and action.
-func (h *MountTaskHandler) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {
+func (h *MountChecker) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {
 	device, ok := params["device"].(string)
 	if !ok || device == "" {
-		return fmt.Errorf("mount task: 'device' parameter missing or invalid")
+		return fmt.Errorf("mount check: 'device' parameter missing or invalid")
 	}
 	dir, ok := params["dir"].(string)
 	if !ok || dir == "" {
-		return fmt.Errorf("mount task: 'dir' parameter missing or invalid")
+		return fmt.Errorf("mount check: 'dir' parameter missing or invalid")
 	}
 
 	log.Debug().Str("device", device).Str("directory", dir).Msg("Checking if mounted")

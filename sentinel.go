@@ -21,9 +21,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Lunal98/go-sentinel/check"
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
-	"github.com/Lunal98/go-sentinel/task"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
@@ -37,15 +37,15 @@ var (
 	currentConfig     config.Config
 	v                 *viper.Viper
 	stateManager      *state.Manager
-	taskScheduler     *task.Scheduler
+	CheckScheduler    *check.Scheduler
 	log               *zerolog.Logger
-	userTaskHandlers  map[string]TaskHandler
+	userCheckHandlers map[string]CheckHandler
 	userStateHandlers map[string]StateHandler
 )
 
 func init() {
 	userStateHandlers = make(map[string]StateHandler)
-	userTaskHandlers = make(map[string]TaskHandler)
+	userCheckHandlers = make(map[string]CheckHandler)
 	templog := globalLogger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log = &templog
 	log.Level(zerolog.InfoLevel)
@@ -64,13 +64,13 @@ func init() {
 	}
 }
 
-type TaskHandler = task.TaskHandler
+type CheckHandler = check.CheckHandler
 type StateHandler = state.StateHandler
 
-func RegisterTaskHandler(name string, handl TaskHandler) {
-	userTaskHandlers[name] = handl
-	if taskScheduler != nil {
-		taskScheduler.RegisterHandler(name, handl)
+func RegisterCheckHandler(name string, handl CheckHandler) {
+	userCheckHandlers[name] = handl
+	if CheckScheduler != nil {
+		CheckScheduler.RegisterHandler(name, handl)
 	}
 }
 func RegisterStateHandler(name string, handl StateHandler) {
@@ -116,9 +116,9 @@ func Init() error {
 	for i, n := range userStateHandlers {
 		stateManager.RegisterHandler(i, n)
 	}
-	taskScheduler = task.NewScheduler(currentConfig.Tasks, log)
-	for i, n := range userTaskHandlers {
-		taskScheduler.RegisterHandler(i, n)
+	CheckScheduler = check.NewScheduler(currentConfig.Checks, log)
+	for i, n := range userCheckHandlers {
+		CheckScheduler.RegisterHandler(i, n)
 	}
 
 	return nil
@@ -129,7 +129,7 @@ func Next() {
 	}
 }
 
-// Start runs the main logic of the service, including state management and task scheduling.
+// Start runs the main logic of the service, including state management and Check scheduling.
 // It blocks until a termination signal is received or the context is cancelled.
 func Start(ctx context.Context) {
 
@@ -153,7 +153,7 @@ func Start(ctx context.Context) {
 		currentConfig = newConfig
 		log.Info().Msg("Configuration reloaded successfully.")
 		stateManager.SetStates(currentConfig.States)
-		taskScheduler.SetTasks(currentConfig.Tasks, stateManager)
+		CheckScheduler.SetChecks(currentConfig.Checks, stateManager)
 	})
 
 	v.WatchConfig()
@@ -169,7 +169,7 @@ func Start(ctx context.Context) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		taskScheduler.Run(ctx, stateManager)
+		CheckScheduler.Run(ctx, stateManager)
 	}()
 
 	//sigChan := make(chan os.Signal, 1)

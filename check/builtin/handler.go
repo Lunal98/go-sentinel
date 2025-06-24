@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package handlers
+package builtin
 
 import (
 	"context"
@@ -21,19 +21,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TaskHandler defines the interface for a task that can be executed.
-type TaskHandler interface {
+// CheckHandler defines the interface for a check that can be executed.
+type CheckHandler interface {
 	Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error
 }
 
-// Registry stores registered TaskHandlers.
-var Registry = make(map[string]TaskHandler)
+// Registry stores registered CheckHandlers.
+var Registry = make(map[string]CheckHandler)
 
 // Register adds a new handler to the global registry.
-func Register(actionType string, handler TaskHandler) {
+func Register(actionType string, handler CheckHandler) {
 	Registry[actionType] = handler
 }
 func init() {
-	Register("mount", &MountTaskHandler{})
-	Register("process", &ProcessTaskHandler{})
+	Register("mount", &MountChecker{})
+	Register("process", &ProcessChecker{})
 }

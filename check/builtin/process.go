@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package handlers
+package builtin
 
 import (
 	"context"
@@ -24,16 +24,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ProcessTaskHandler handles tasks that check for a running process.
-type ProcessTaskHandler struct{}
+// ProcessChecker handles checks that check for a running process.
+type ProcessChecker struct{}
 
 var ErrProcessNotRunning = errors.New("process not running")
 
 // Execute checks if a process with a given name is running.
-func (h *ProcessTaskHandler) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {
+func (h *ProcessChecker) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {
 	procName, ok := params["procname"].(string)
 	if !ok || procName == "" {
-		return fmt.Errorf("process task: 'procname' parameter missing or invalid")
+		return fmt.Errorf("process check: 'procname' parameter missing or invalid")
 	}
 
 	found, err := utils.IsProcessRunning(procName)
