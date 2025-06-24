@@ -188,3 +188,6 @@ type NoStatesError struct{}
 func (e *NoStatesError) Error() string {
 	return "configuration must contain at least one state"
 }
+func GetCurrentState() string {
+	return stateManager.CurrentStateName()
+}
