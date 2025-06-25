@@ -51,6 +51,9 @@ func NewScheduler(Checks []config.Check, logger *zerolog.Logger) *Scheduler {
 func (s *Scheduler) RegisterHandler(name string, handl builtin.CheckHandler) {
 	builtin.Register(name, handl)
 }
+func (s *Scheduler) RegisterRemediator(name string, remediator remediation.Remediator) {
+	remediation.Register(name, remediator)
+}
 
 // Run starts the scheduler, which executes Checks based on their frequency.
 func (s *Scheduler) Run(ctx context.Context, sm *state.Manager) {
