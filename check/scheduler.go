@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Lunal98/go-sentinel/check/builtin"
+	"github.com/Lunal98/go-sentinel/check/remediation"
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
 
@@ -36,6 +37,7 @@ type Scheduler struct {
 }
 
 type CheckHandler = builtin.CheckHandler
+type Remediator = remediation.Remediator
 
 // NewScheduler creates a new Check scheduler.
 func NewScheduler(Checks []config.Check, logger *zerolog.Logger) *Scheduler {
