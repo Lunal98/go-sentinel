@@ -158,6 +158,71 @@ func (s *Scheduler) executeCheck(ctx context.Context, Check config.Check, sm *st
 		s.log.Warn().Msg("Check executed successfully, but process is not running, restarting state")
 		sm.Saferestart()
 	} else {
-		s.log.Error().Err(err).Str("Check", Check.Name).Msg("Check execution failed")
+		s.log.Error().Err(err).Str("Check", Check.Name).Msg("Check failed, starting remediation")
+		s.handleRemediation(ctx, Check, sm)
 	}
+}
+
+func (s *Scheduler) handleRemediation(ctx context.Context, Check config.Check, sm *state.Manager) {
+	if len(Check.Remediation) == 0 {
+		s.log.Warn().Str("Check", Check.Name).Msg("No remediation actions defined for this Check")
+		return
+	}
+
+	for _, rem := range Check.Remediation {
+		remediator, ok := remediation.Registry[rem.Type]
+		if !ok {
+			s.log.Error().Str("check", Check.Name).Str("remediation", rem.Type).Msg("No remediator registered for this type")
+			continue
+		}
+
+		if rem.Before != "" {
+			delay, err := time.ParseDuration(rem.Before)
+			if err != nil {
+				s.log.Error().Err(err).Str("Check", Check.Name).Msg("Invalid delay duration for remediation")
+				continue
+			}
+			s.log.Info().Str("check", Check.Name).Str("remediation", rem.Type).Dur("delay", delay).Msg("Delaying remediation")
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				s.log.Debug().Str("Check", Check.Name).Msg("Stopping remediation due to context cancellation.")
+				return
+			}
+		}
+
+		if err := remediator.Start(ctx, s.log, rem.Params); err != nil {
+			s.log.Error().Err(err).Str("check", Check.Name).Str("remediation", rem.Type).Msg("Failed to start remediation")
+			continue
+		}
+
+		if rem.After != "" {
+			delay, err := time.ParseDuration(rem.After)
+			if err != nil {
+				s.log.Error().Err(err).Str("Check", Check.Name).Msg("Invalid post-remediation delay duration")
+				continue
+			}
+			s.log.Info().Str("check", Check.Name).Str("remediation", rem.Type).Dur("delay", delay).Msg("Delaying post-remediation check")
+			select {
+			case <-time.After(delay):
+				handler, ok := builtin.Registry[Check.Action.Type]
+				if !ok {
+					s.log.Error().Str("Check", Check.Name).Str("type", Check.Action.Type).Msg("Handler not found for post-remediation check")
+					return
+				}
+				s.log.Debug().Str("check", Check.Name).Str("remediation", rem.Type).Msg("Executing post-remediation check")
+				err := handler.Execute(ctx, s.log, Check.Action.Params)
+				if err != nil {
+					s.log.Debug().Msg("Problem not resolved after remediation")
+				} else {
+					s.log.Info().Str("check", Check.Name).Str("remediation", rem.Type).Msg("Remediation successful, post-remediation check passed")
+				}
+
+			case <-ctx.Done():
+				s.log.Debug().Str("Check", Check.Name).Msg("Stopping post-remediation check due to context cancellation.")
+				return
+			}
+		}
+	}
+	s.log.Error().Str("Check", Check.Name).Msg("Remediation actions completed without resolving the issue")
 }
