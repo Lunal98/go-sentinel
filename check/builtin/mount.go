@@ -19,11 +19,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/Lunal98/go-sentinel/utils"
-
 	"github.com/rs/zerolog"
 )
 
@@ -34,11 +32,15 @@ type MountChecker struct{}
 func (h *MountChecker) Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error {
 	device, ok := params["device"].(string)
 	if !ok || device == "" {
-		return fmt.Errorf("mount check: 'device' parameter missing or invalid")
+		log.Error().Msg("Mount remediator: 'device' parameter missing or invalid")
+		return nil
+		//return fmt.Errorf("mount remediator: 'device' parameter missing or invalid")
 	}
 	dir, ok := params["dir"].(string)
 	if !ok || dir == "" {
-		return fmt.Errorf("mount check: 'dir' parameter missing or invalid")
+		log.Error().Msg("Mount remediator: 'dir' parameter missing or invalid")
+		return nil
+		//return fmt.Errorf("mount remediator: 'dir' parameter missing or invalid")
 	}
 
 	log.Debug().Str("device", device).Str("directory", dir).Msg("Checking if mounted")
@@ -46,7 +48,8 @@ func (h *MountChecker) Execute(ctx context.Context, log *zerolog.Logger, params 
 	mounted, err := utils.IsMounted(device, dir)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to check filesystem mount status")
-		return fmt.Errorf("failed to check mount status: %w", err)
+		return nil
+		//return fmt.Errorf("failed to check mount status: %w", err)
 	}
 
 	if mounted {
@@ -57,19 +60,8 @@ func (h *MountChecker) Execute(ctx context.Context, log *zerolog.Logger, params 
 	log.Info().Str("device", device).Str("directory", dir).Msg("Attempting to mount filesystem")
 	fstabContent, err := os.ReadFile("/etc/fstab")
 	if err == nil && strings.Contains(string(fstabContent), device+" "+dir) {
-		cmd := exec.CommandContext(ctx, "sudo", "mount", "-a")
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Error().Err(err).Str("device", device).Str("directory", dir).Bytes("output", output).Msg("Failed to mount")
-			return fmt.Errorf("mount command for %s failed: %w, output: %s", device, err, string(output))
-		}
-
-		log.Info().Str("device", device).Str("directory", dir).Msg("Successfully mounted filesystem")
-		return nil
-
-	} else {
-		log.Error().Str("device", device).Str("directory", dir).Msg("Was not found in fstab, could not be mounted")
-		return fmt.Errorf("prerequisites for mounting %s failed: %w", device, err)
+		return fmt.Errorf("mount found in /etc/fstab, but not mounted: %s %s", device, dir)
 	}
+	return nil
 
 }

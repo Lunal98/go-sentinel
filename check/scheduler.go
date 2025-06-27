@@ -48,7 +48,7 @@ func NewScheduler(Checks []config.Check, logger *zerolog.Logger) *Scheduler {
 	}
 }
 
-func (s *Scheduler) RegisterHandler(name string, handl builtin.CheckHandler) {
+func (s *Scheduler) RegisterCheckHandler(name string, handl builtin.CheckHandler) {
 	builtin.Register(name, handl)
 }
 func (s *Scheduler) RegisterRemediator(name string, remediator remediation.Remediator) {

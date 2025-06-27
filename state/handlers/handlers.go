@@ -108,7 +108,3 @@ func (h *DefaultCmdStateHandler) Restart(ctx context.Context, oldCmd *exec.Cmd, 
 	}
 	return h.Start(ctx, state, log)
 }
-
-func init() {
-	Register("cmd", &DefaultCmdStateHandler{})
-}

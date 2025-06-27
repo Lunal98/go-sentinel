@@ -17,6 +17,6 @@ func Register(actionType string, handler Remediator) {
 	Registry[actionType] = handler
 }
 func init() {
-	Register("mount", &NetworkResetter{})
+	Register("mount", &FSRemounter{})
 	Register("process", &StateRestarter{})
 }

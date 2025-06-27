@@ -22,8 +22,11 @@ import (
 	"sync"
 
 	"github.com/Lunal98/go-sentinel/check"
+	"github.com/Lunal98/go-sentinel/check/builtin"
+	"github.com/Lunal98/go-sentinel/check/remediation"
 	"github.com/Lunal98/go-sentinel/config"
 	"github.com/Lunal98/go-sentinel/state"
+	"github.com/Lunal98/go-sentinel/state/handlers"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
@@ -62,6 +65,16 @@ func init() {
 	if configPath := os.Getenv("GO_SENTINEL_CONFIG"); configPath != "" {
 		v.SetConfigFile(configPath)
 	}
+	CheckScheduler.RegisterRemediator("state_restart", &remediation.StateRestarter{
+		Sm: stateManager,
+	})
+
+	CheckScheduler.RegisterRemediator("remount", &remediation.FSRemounter{})
+	handlers.Register("cmd", &handlers.DefaultCmdStateHandler{})
+
+	CheckScheduler.RegisterCheckHandler("mount", &builtin.MountChecker{})
+	CheckScheduler.RegisterCheckHandler("process", &builtin.ProcessChecker{})
+
 }
 
 type CheckHandler = check.CheckHandler
@@ -70,7 +83,7 @@ type StateHandler = state.StateHandler
 func RegisterCheckHandler(name string, handl CheckHandler) {
 	userCheckHandlers[name] = handl
 	if CheckScheduler != nil {
-		CheckScheduler.RegisterHandler(name, handl)
+		CheckScheduler.RegisterCheckHandler(name, handl)
 	}
 }
 func RegisterStateHandler(name string, handl StateHandler) {
@@ -118,7 +131,7 @@ func Init() error {
 	}
 	CheckScheduler = check.NewScheduler(currentConfig.Checks, log)
 	for i, n := range userCheckHandlers {
-		CheckScheduler.RegisterHandler(i, n)
+		CheckScheduler.RegisterCheckHandler(i, n)
 	}
 
 	return nil
