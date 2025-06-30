@@ -3,14 +3,14 @@
 
 # go-sentinel: A Go-based Process & State Manager
 
-go-sentinel is a lightweight, Go-based daemon designed to manage long-running processes (referred to as "states") and execute scheduled tasks based on system conditions or time. It provides robust state management, graceful process lifecycle control, and dynamic configuration reloading, making it ideal for maintaining the desired operational state of your system.
+go-sentinel is a lightweight, Go-based daemon designed to manage long-running processes (referred to as "states") and execute scheduled checks based on system conditions or time. It provides robust state management, graceful process lifecycle control, and dynamic configuration reloading, making it ideal for maintaining the desired operational state of your system.
 
 ## ✨ Features
 
 * **State Management:** Define and transition between different operational states, each launching a specified long-running process with customizable handlers.
-* **Task Scheduling:** Execute one-shot or periodic tasks.
-* **Conditional Task Execution:** Run tasks only when the system is in a specific defined state.
-* **Extensible Handlers:** Easily integrate new types of tasks or states (e.g., mount checks, process restarts, custom cmd wrappers).
+* **Check Scheduling:** Execute one-shot or periodic checks.
+* **Conditional Check Execution:** Run checks only when the system is in a specific defined state.
+* **Extensible Handlers:** Easily integrate new types of checks or states (e.g., mount checks, process restarts, custom cmd wrappers).
 * **Robust Logging:** Provides detailed logging using `zerolog` for easy debugging and monitoring.
 
 ## 🚀 Getting Started
@@ -55,10 +55,10 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to initialize sentinel config")
 	}
 
-	// Register custom state and task handlers *before* starting sentinel.
-	// Replace 'myCustomTaskHandler' and 'myCustomStateHandler' with your actual implementations.
+	// Register custom state and check handlers *before* starting sentinel.
+	// Replace 'myCustomCheckHandler' and 'myCustomStateHandler' with your actual implementations.
 	// You would typically define these structs and their methods elsewhere in your application.
-	sentinel.RegisterTaskHandler("mycustomtaskhandler", &myCustomTaskHandler{})
+	sentinel.RegisterCheckHandler("mycustomcheckhandler", &myCustomCheckHandler{})
 	sentinel.RegisterStateHandler("mycustomstatehandler", &myCustomStateHandler{})
 
   sigChan := make(chan os.Signal, 1)
@@ -125,17 +125,17 @@ The `sentinel` library offers a set of exposed functions for users to seamlessly
     sentinel.SetLogLevel(zerolog.DebugLevel)
     ```
 
-  * **`RegisterTaskHandler(name string, handler TaskHandler)`**: This function is used to register custom functions that will be executed as "tasks" within your defined states. The `name` provided here should match the task name specified in your configuration.
+  * **`RegisterCheckHandler(name string, handler CheckHandler)`**: This function is used to register custom functions that will be executed as "checks" within your defined states. The `name` provided here should match the check name specified in your configuration.
 
     ```go
-    sentinel.RegisterTaskHandler("my_custom_task", myTaskLogic)
+    sentinel.RegisterCheckHandler("my_custom_check", myCheckLogic)
     ```
 
-  * **`RegisterStateHandler(name string, handler StateHandler)`**: Similar to task handlers, this allows you to register custom functions that will be called when the system enters a specific state. The `name` should correspond to a state defined in your configuration.
+  * **`RegisterStateHandler(name string, handler StateHandler)`**: Similar to check handlers, this allows you to register custom functions that will be called when the system enters a specific state. The `name` should correspond to a state defined in your configuration.
     ```go
     sentinel.RegisterStateHandler("initial_state", myStateEntryLogic)
     ```
-  * **`Start(ctx context.Context)`**: This is the main entry point to run the Sentinel service. It will block until the provided context is cancelled, orchestrating state transitions and task execution as defined in your configuration.
+  * **`Start(ctx context.Context)`**: This is the main entry point to run the Sentinel service. It will block until the provided context is cancelled, orchestrating state transitions and check execution as defined in your configuration.
 
     ```go
     ctx, cancel := context.WithCancel(context.Background())
@@ -190,8 +190,8 @@ states:
       extensionfilter:
         - jpg
         - png
-# Tasks define checks that make sure the dependcies of the States are in a healthy condition
-tasks:
+# Checks define checks that make sure the dependcies of the States are in a healthy condition
+checks:
   - name: mount
     frequency:
       type: oneshot
@@ -207,7 +207,7 @@ tasks:
       time: 5m
     condition:
       state: name
-    # Actions with type "process" will restart the current task if the specified process is not running
+    # Actions with type "process" will restart the current check if the specified process is not running
     action:
       type: process
       params:
@@ -221,12 +221,12 @@ tasks:
 
 ### Project Structure
 
-  * `/`: Entry point, handles configuration loading, signal handling, and orchestrates the state and task managers.
+  * `/`: Entry point, handles configuration loading, signal handling, and orchestrates the state and check managers.
   * `config/`: Defines the structure for `go-sentinel`'s YAML configuration.
   * `state/`: Manages the lifecycle of long-running processes ("states"), including starting, stopping, and transitioning between them.
-  * `state/handlers`: Implements the task handlers.
-  * `task/`: Implements the task scheduling logic and defines interfaces for custom task handlers.
-  * `task/handlers`: Implements the task handlers.
+  * `state/handlers`: Implements the check handlers.
+  * `check/`: Implements the check scheduling logic and defines interfaces for custom check handlers.
+  * `check/handlers`: Implements the check handlers.
   * `utils/`: Contains utility functions (e.g., for checking mount status).
   
 
@@ -248,22 +248,22 @@ Then, register your new handler using sentinel.RegisterStateHandler in your main
 ```go
 sentinel.RegisterStateHandler("mycustomhandler", &MyCustomStateHandler{})
 ```
-### Adding New Task Handlers
+### Adding New Check Handlers
 
-To extend `go-sentinel` with new functionality, implement the `TaskHandler` interface:
+To extend `go-sentinel` with new functionality, implement the `CheckHandler` interface:
 
 ```go
-// task/registry.go
-type TaskHandler interface {
+// check/registry.go
+type CheckHandler interface {
     Execute(ctx context.Context, log *zerolog.Logger, params map[string]interface{}) error
 }
 ```
 
-Then, register your new handler using sentinel.RegisterTaskHandler in your main function 
+Then, register your new handler using sentinel.RegisterCheckHandler in your main function 
 
 ```go
 
- sentinel.RegisterTaskHandler("your_new_action_type", &MyCustomTaskHandler{})
+ sentinel.RegisterCheckHandler("your_new_action_type", &MyCustomCheckHandler{})
 
 
 ```
