@@ -39,10 +39,10 @@ type Manager struct {
 	managerCancel context.CancelFunc
 }
 
-type StateHandler = handlers.StateHandler
+type StateHandlerFactory = handlers.StateHandlerFactory
 
-func (s *Manager) RegisterHandler(name string, handl handlers.StateHandler) {
-	handlers.Register(name, handl)
+func (s *Manager) RegisterHandler(name string, handl handlers.StateHandlerFactory) {
+	handlers.RegisterType(name, handl)
 }
 
 // NewManager creates a new state manager.
@@ -53,11 +53,24 @@ func NewManager(states []config.State, logger *zerolog.Logger) *Manager {
 		currentIndex: -1,
 	}
 }
+func (m *Manager) createHandlerInstances() {
+	handlers.Registry = make(map[string]handlers.StateHandler, len(m.states))
+	for _, n := range m.states {
+		factory, ok := handlers.FactoryRegistry[n.Type]
+		if !ok {
+			m.log.Error().Str("StateName", n.Name).Str("Type", n.Type).Msg("Type not found")
+			return
+		}
+
+		handlers.Register(n.Name, factory.New(n, m.log))
+
+	}
+}
 
 // Run starts the initial state and keeps it running until the context is cancelled.
 func (m *Manager) Run(ctx context.Context) {
 	m.managerCtx, m.managerCancel = context.WithCancel(ctx)
-
+	m.createHandlerInstances()
 	m.Next()
 
 	<-m.managerCtx.Done()
@@ -82,6 +95,7 @@ func (m *Manager) SetStates(newStates []config.State) {
 
 	m.states = newStates
 	m.currentIndex = -1
+	m.createHandlerInstances()
 
 	if len(m.states) > 0 {
 		m.log.Info().Msg("New states applied. Starting the first state.")
@@ -125,7 +139,7 @@ func (m *Manager) startCurrentUnsafe() {
 	state := m.states[m.currentIndex]
 	m.log.Info().Str("name", state.Name).Str("type", state.Type).Msg("Attempting to start state with handler")
 
-	handler, ok := handlers.Registry[state.Type]
+	handler, ok := handlers.Registry[state.Name]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type")
 		return
@@ -168,7 +182,7 @@ func (m *Manager) stopCurrentUnsafe() {
 	}
 
 	state := m.states[m.currentIndex]
-	handler, ok := handlers.Registry[state.Type]
+	handler, ok := handlers.Registry[state.Name]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type, attempting default stop")
 		if m.currentCmd != nil && m.currentCmd.Process != nil {
@@ -255,7 +269,7 @@ func (m *Manager) Saferestart() {
 	}
 
 	state := m.states[m.currentIndex]
-	handler, ok := handlers.Registry[state.Type]
+	handler, ok := handlers.Registry[state.Name]
 	if !ok {
 		m.log.Error().Str("state", state.Name).Str("type", state.Type).Msg("No handler registered for this state type, cannot safely restart.")
 		m.log.Info().Msg("Performing a default restart of the current state.")

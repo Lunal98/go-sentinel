@@ -39,13 +39,20 @@ type StateHandler interface {
 	// It returns the new *exec.Cmd if a process is started, or nil.
 	Restart(ctx context.Context, oldCmd *exec.Cmd, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
 }
+type StateHandlerFactory interface {
+	New(state config.State, log *zerolog.Logger) StateHandler
+}
 
 // Registry stores registered StateHandlers.
 var Registry = make(map[string]StateHandler)
+var FactoryRegistry = make(map[string]StateHandlerFactory)
 
 // Register registers a StateHandler for a given type string.
 func Register(handlerType string, handler StateHandler) {
 	Registry[handlerType] = handler
+}
+func RegisterType(handlerType string, handlerFactory StateHandlerFactory) {
+	FactoryRegistry[handlerType] = handlerFactory
 }
 
 // DefaultCmdStateHandler implements StateHandler for "cmd" type states.
