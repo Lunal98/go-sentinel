@@ -184,7 +184,7 @@ func (m *Manager) stopCurrentUnsafe() {
 		return
 	}
 
-	if err := handler.Stop(m.currentCmd, m.log); err != nil {
+	if err := handler.Stop(m.log); err != nil {
 		m.log.Error().Err(err).Str("state", state.Name).Msg("Failed to stop state via handler")
 	}
 	m.currentCmd = nil
@@ -265,7 +265,7 @@ func (m *Manager) Saferestart() {
 	}
 
 	m.log.Info().Msg("Performing a safe restart of the current state using its handler.")
-	newCmd, err := handler.Restart(m.managerCtx, m.currentCmd, state, m.log)
+	newCmd, err := handler.Restart(m.managerCtx, state, m.log)
 	if err != nil {
 		m.log.Error().Err(err).Str("state", state.Name).Msg("Failed to restart state via handler")
 		return
