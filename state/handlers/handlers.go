@@ -34,10 +34,10 @@ type StateHandler interface {
 	// or nil if it manages the state internally.
 	Start(ctx context.Context, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
 	// Stop should gracefully terminate the state's operation.
-	Stop(log *zerolog.Logger) error
+	Stop(cmd *exec.Cmd, log *zerolog.Logger) error
 	// Restart should restart the state's operation, potentially handling parameter changes.
 	// It returns the new *exec.Cmd if a process is started, or nil.
-	Restart(ctx context.Context, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
+	Restart(ctx context.Context, oldCmd *exec.Cmd, state config.State, log *zerolog.Logger) (*exec.Cmd, error)
 }
 
 // Registry stores registered StateHandlers.
@@ -49,9 +49,7 @@ func Register(handlerType string, handler StateHandler) {
 }
 
 // DefaultCmdStateHandler implements StateHandler for "cmd" type states.
-type DefaultCmdStateHandler struct {
-	cmd *exec.Cmd
-}
+type DefaultCmdStateHandler struct{}
 
 // getCmdFromParams extracts the command string from state.Params.
 func (h *DefaultCmdStateHandler) getCmdFromParams(state config.State) (string, error) {
@@ -80,22 +78,22 @@ func (h *DefaultCmdStateHandler) Start(ctx context.Context, state config.State, 
 		return nil, fmt.Errorf("state command is empty for state %s", state.Name)
 	}
 
-	h.cmd = exec.CommandContext(ctx, parts[0], parts[1:]...)
-	h.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	if err := h.cmd.Start(); err != nil {
+	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start state %s: %w", state.Name, err)
 	}
-	return h.cmd, nil
+	return cmd, nil
 }
 
 // Stop implements the Stop method for DefaultCmdStateHandler.
-func (h *DefaultCmdStateHandler) Stop(log *zerolog.Logger) error {
-	if h.cmd != nil && h.cmd.Process != nil {
-		log.Info().Int("pid", h.cmd.Process.Pid).Msg("Stopping cmd state")
-		if err := syscall.Kill(-h.cmd.Process.Pid, syscall.SIGTERM); err != nil {
+func (h *DefaultCmdStateHandler) Stop(cmd *exec.Cmd, log *zerolog.Logger) error {
+	if cmd != nil && cmd.Process != nil {
+		log.Info().Int("pid", cmd.Process.Pid).Msg("Stopping cmd state")
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM); err != nil {
 			log.Error().Err(err).Msg("Failed to send SIGTERM to process group, attempting to kill main process")
-			if err := h.cmd.Process.Kill(); err != nil {
+			if err := cmd.Process.Kill(); err != nil {
 				return fmt.Errorf("failed to kill process: %w", err)
 			}
 		}
@@ -104,8 +102,8 @@ func (h *DefaultCmdStateHandler) Stop(log *zerolog.Logger) error {
 }
 
 // Restart implements the Restart method for DefaultCmdStateHandler.
-func (h *DefaultCmdStateHandler) Restart(ctx context.Context, state config.State, log *zerolog.Logger) (*exec.Cmd, error) {
-	if err := h.Stop(log); err != nil {
+func (h *DefaultCmdStateHandler) Restart(ctx context.Context, oldCmd *exec.Cmd, state config.State, log *zerolog.Logger) (*exec.Cmd, error) {
+	if err := h.Stop(oldCmd, log); err != nil {
 		log.Error().Err(err).Msg("Error stopping old cmd during restart")
 	}
 	return h.Start(ctx, state, log)
