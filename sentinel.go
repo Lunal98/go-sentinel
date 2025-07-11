@@ -36,18 +36,18 @@ import (
 )
 
 var (
-	configMutex       sync.RWMutex
-	currentConfig     config.Config
-	v                 *viper.Viper
-	stateManager      *state.Manager
-	CheckScheduler    *check.Scheduler
-	log               *zerolog.Logger
-	userCheckHandlers map[string]CheckHandler
-	userStateHandlers map[string]StateHandler
+	configMutex                sync.RWMutex
+	currentConfig              config.Config
+	v                          *viper.Viper
+	stateManager               *state.Manager
+	CheckScheduler             *check.Scheduler
+	log                        *zerolog.Logger
+	userCheckHandlers          map[string]CheckHandler
+	userStateHandlersFactories map[string]handlers.StateHandlerFactory
 )
 
 func init() {
-	userStateHandlers = make(map[string]StateHandler)
+	userStateHandlersFactories = make(map[string]StateHandlerFactory)
 	userCheckHandlers = make(map[string]CheckHandler)
 	templog := globalLogger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log = &templog
@@ -78,7 +78,7 @@ func init() {
 }
 
 type CheckHandler = check.CheckHandler
-type StateHandler = state.StateHandler
+type StateHandlerFactory = state.StateHandlerFactory
 
 func RegisterCheckHandler(name string, handl CheckHandler) {
 	userCheckHandlers[name] = handl
@@ -86,8 +86,8 @@ func RegisterCheckHandler(name string, handl CheckHandler) {
 		CheckScheduler.RegisterCheckHandler(name, handl)
 	}
 }
-func RegisterStateHandler(name string, handl StateHandler) {
-	userStateHandlers[name] = handl
+func RegisterStateHandler(name string, handl handlers.StateHandlerFactory) {
+	userStateHandlersFactories[name] = handl
 	if stateManager != nil {
 		stateManager.RegisterHandler(name, handl)
 
@@ -126,7 +126,7 @@ func Init() error {
 		return &NoStatesError{}
 	}
 	stateManager = state.NewManager(currentConfig.States, log)
-	for i, n := range userStateHandlers {
+	for i, n := range userStateHandlersFactories {
 		stateManager.RegisterHandler(i, n)
 	}
 	CheckScheduler = check.NewScheduler(currentConfig.Checks, log)
